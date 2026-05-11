@@ -1,0 +1,2188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LLM-First Architecture — Manifesto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c0e;
+    --bg2: #0d1417;
+    --bg3: #111820;
+    --surface: #141e24;
+    --surface2: #1a2830;
+    --border: #1e2f38;
+    --border2: #243845;
+    --accent: #00e5a0;
+    --accent2: #00b37d;
+    --accent-dim: rgba(0,229,160,0.08);
+    --accent-glow: rgba(0,229,160,0.15);
+    --text: #e8f0f4;
+    --text2: #8fa8b8;
+    --text3: #4d6b7a;
+    --warn: #ff6b35;
+    --info: #4eb8ff;
+    --gold: #f0c060;
+    --nav-w: 260px;
+    --r: 6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  /* ── SIDEBAR NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0;
+    width: var(--nav-w); height: 100vh;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 32px 0; z-index: 100;
+    overflow-y: auto;
+  }
+
+  nav::-webkit-scrollbar { width: 3px; }
+  nav::-webkit-scrollbar-track { background: transparent; }
+  nav::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .nav-logo {
+    padding: 0 24px 28px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .nav-logo .logo-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: 4px;
+    padding: 6px 12px;
+    margin-bottom: 10px;
+  }
+
+  .nav-logo .logo-dot {
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .nav-logo .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px; font-weight: 700;
+    color: var(--accent); letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .nav-logo .version {
+    font-size: 11px; color: var(--text3);
+    letter-spacing: 0.05em;
+  }
+
+  .nav-section-label {
+    font-size: 10px; font-weight: 500;
+    color: var(--text3); letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0 24px 8px;
+  }
+
+  nav a {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 24px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 12px; font-weight: 400;
+    transition: all 0.2s;
+    border-left: 2px solid transparent;
+    position: relative;
+  }
+
+  nav a:hover, nav a.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  nav a .nav-num {
+    font-size: 10px; color: var(--text3);
+    min-width: 18px;
+  }
+
+  nav a:hover .nav-num { color: var(--accent2); }
+
+  .nav-footer {
+    margin-top: auto; padding: 20px 24px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .nav-footer p { font-size: 11px; color: var(--text3); line-height: 1.6; }
+
+  /* ── MAIN CONTENT ── */
+  main {
+    margin-left: var(--nav-w);
+    min-height: 100vh;
+    position: relative; z-index: 1;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 80px 72px;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute; top: -200px; right: -200px;
+    width: 700px; height: 700px;
+    background: radial-gradient(circle, rgba(0,229,160,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute; bottom: -100px; left: 100px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(78,184,255,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.25);
+    border-radius: 3px;
+    padding: 5px 14px;
+    font-size: 11px; color: var(--accent);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    margin-bottom: 40px;
+    width: fit-content;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(48px, 6vw, 88px);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    margin-bottom: 12px;
+    animation: fadeUp 0.8s 0.1s ease both;
+  }
+
+  .hero h1 .line-accent {
+    color: var(--accent);
+    display: block;
+  }
+
+  .hero h1 .line-dim {
+    color: var(--text3);
+    display: block;
+    font-style: italic;
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: 0.65em;
+    letter-spacing: -0.01em;
+    margin-top: 8px;
+  }
+
+  .hero-sub {
+    margin-top: 36px;
+    max-width: 560px;
+    color: var(--text2);
+    font-size: 14px;
+    line-height: 1.8;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+
+  .hero-meta {
+    display: flex; gap: 32px; margin-top: 52px;
+    animation: fadeUp 0.8s 0.3s ease both;
+  }
+
+  .hero-meta-item { display: flex; flex-direction: column; gap: 4px; }
+  .hero-meta-item .label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.12em; }
+  .hero-meta-item .value { font-size: 13px; color: var(--accent); font-weight: 500; }
+
+  .hero-grid-bg {
+    position: absolute; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 80% at 100% 0%, black 20%, transparent 70%);
+    opacity: 0.3;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SECTIONS ── */
+  section {
+    padding: 80px 72px;
+    border-bottom: 1px solid var(--border);
+    opacity: 0; transform: translateY(30px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+
+  section.visible { opacity: 1; transform: translateY(0); }
+
+  .section-header {
+    display: flex; align-items: flex-start; gap: 20px;
+    margin-bottom: 52px;
+  }
+
+  .section-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px; font-weight: 700;
+    color: var(--accent); opacity: 0.6;
+    padding-top: 6px; min-width: 28px;
+  }
+
+  .section-title-block { flex: 1; }
+
+  .section-tag {
+    font-size: 10px; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 3.5vw, 44px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+  }
+
+  h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px; font-weight: 700;
+    margin-bottom: 16px; color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  h4 {
+    font-family: 'Syne', sans-serif;
+    font-size: 14px; font-weight: 700;
+    color: var(--accent); margin-bottom: 12px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+
+  p { color: var(--text2); margin-bottom: 20px; line-height: 1.8; font-size: 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  strong { color: var(--text); font-weight: 500; }
+  em { color: var(--info); font-style: normal; }
+
+  /* ── CARDS ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 28px;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative; overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+    opacity: 0; transition: opacity 0.3s;
+  }
+
+  .card:hover { border-color: var(--border2); background: var(--surface2); }
+  .card:hover::before { opacity: 1; }
+
+  .card-icon {
+    font-size: 22px; margin-bottom: 16px;
+    display: block;
+  }
+
+  .card p { font-size: 13px; }
+
+  /* ── CODE BLOCKS ── */
+  .code-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin: 24px 0;
+    font-size: 13px;
+  }
+
+  .code-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .code-header .dots { display: flex; gap: 6px; }
+  .code-header .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+  .dot-r { background: #ff5f56; }
+  .dot-y { background: #ffbd2e; }
+  .dot-g { background: #27c93f; }
+
+  .code-header .filename {
+    font-size: 11px; color: var(--text3);
+    letter-spacing: 0.05em;
+  }
+
+  .code-body {
+    padding: 22px 22px;
+    overflow-x: auto;
+    line-height: 1.7;
+  }
+
+  .code-body::-webkit-scrollbar { height: 4px; }
+  .code-body::-webkit-scrollbar-track { background: transparent; }
+  .code-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  pre { font-family: 'JetBrains Mono', monospace; white-space: pre; }
+
+  .c-green { color: var(--accent); }
+  .c-blue { color: var(--info); }
+  .c-gold { color: var(--gold); }
+  .c-dim { color: var(--text3); }
+  .c-red { color: var(--warn); }
+  .c-white { color: var(--text); }
+  .c-purple { color: #c084fc; }
+
+  /* ── DIAGRAM ── */
+  .diagram {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 40px;
+    margin: 24px 0;
+    font-size: 13px;
+  }
+
+  .diagram-flow {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 0;
+  }
+
+  .diagram-box {
+    width: 100%; max-width: 560px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    padding: 18px 24px;
+    position: relative;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .diagram-box:hover {
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+
+  .diagram-box .box-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700;
+    color: var(--text); margin-bottom: 4px;
+  }
+
+  .diagram-box .box-desc {
+    font-size: 11px; color: var(--text3); line-height: 1.5;
+  }
+
+  .diagram-box .box-tag {
+    position: absolute; top: -1px; right: 14px;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 0 0 4px 4px;
+  }
+
+  .diagram-arrow {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 6px 0; color: var(--text3); font-size: 12px;
+  }
+
+  .diagram-arrow span { line-height: 1; }
+
+  /* ── PRINCIPLES ── */
+  .principle-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .principle {
+    display: flex; gap: 20px;
+    padding: 24px 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+
+  .principle::after {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    transform: scaleY(0); transform-origin: bottom;
+    transition: transform 0.3s;
+  }
+
+  .principle:hover { background: var(--surface2); border-color: var(--border2); }
+  .principle:hover::after { transform: scaleY(1); }
+
+  .principle-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px; font-weight: 800;
+    color: var(--border2); line-height: 1;
+    min-width: 36px; padding-top: 2px;
+    transition: color 0.2s;
+  }
+
+  .principle:hover .principle-num { color: var(--accent); opacity: 0.5; }
+
+  .principle-body h3 { font-size: 15px; margin-bottom: 8px; }
+  .principle-body p { font-size: 13px; margin-bottom: 0; }
+
+  /* ── TABLE ── */
+  .table-wrap {
+    overflow-x: auto;
+    border-radius: var(--r);
+    border: 1px solid var(--border);
+    margin: 24px 0;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  thead th {
+    background: var(--surface);
+    color: var(--text3);
+    font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 12px 18px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody td {
+    padding: 13px 18px;
+    color: var(--text2);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.6;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--accent-dim); }
+
+  tbody td:first-child { color: var(--accent); font-weight: 500; }
+
+  /* ── CONTEXT MD SHOWCASE ── */
+  .context-showcase {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    margin-top: 32px;
+  }
+
+  @media (max-width: 1100px) {
+    .context-showcase { grid-template-columns: 1fr; }
+  }
+
+  /* ── RESTRICTION BOXES ── */
+  .restriction-box {
+    background: rgba(255,107,53,0.06);
+    border: 1px solid rgba(255,107,53,0.2);
+    border-radius: var(--r);
+    padding: 16px 20px;
+    font-size: 13px;
+    color: var(--text2);
+    margin: 8px 0;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+
+  .restriction-box .icon { color: var(--warn); min-width: 16px; }
+
+  /* ── PROTOCOL STEPS ── */
+  .steps { display: flex; flex-direction: column; gap: 12px; }
+
+  .step {
+    display: flex; gap: 16px;
+    padding: 20px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+  }
+
+  .step-num {
+    width: 28px; height: 28px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.25);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 12px; font-weight: 700;
+    color: var(--accent); min-width: 28px;
+  }
+
+  .step-body h4 { font-size: 13px; margin-bottom: 4px; color: var(--text); text-transform: none; letter-spacing: 0; }
+  .step-body p { font-size: 12px; margin-bottom: 0; }
+
+  /* ── ROADMAP ── */
+  .roadmap { display: flex; flex-direction: column; gap: 0; position: relative; }
+
+  .roadmap::before {
+    content: '';
+    position: absolute; left: 20px; top: 20px; bottom: 20px;
+    width: 1px; background: var(--border2);
+  }
+
+  .roadmap-item {
+    display: flex; gap: 24px;
+    padding: 24px 0;
+    position: relative;
+  }
+
+  .roadmap-dot {
+    width: 40px; height: 40px; min-width: 40px;
+    background: var(--surface);
+    border: 2px solid var(--border2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 11px; font-weight: 800;
+    color: var(--text3);
+    position: relative; z-index: 1;
+    transition: all 0.3s;
+  }
+
+  .roadmap-item.done .roadmap-dot {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .roadmap-item.active .roadmap-dot {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  .roadmap-content h3 { font-size: 15px; margin-bottom: 8px; }
+  .roadmap-content p { font-size: 13px; }
+
+  .roadmap-tasks { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+
+  .roadmap-task {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; color: var(--text3);
+  }
+
+  .roadmap-task.done { color: var(--text2); }
+  .roadmap-task.done::before { content: '✓'; color: var(--accent); }
+  .roadmap-task:not(.done)::before { content: '○'; color: var(--text3); }
+
+  /* ── PROMPT BOX ── */
+  .prompt-box {
+    background: var(--bg3);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: var(--r);
+    overflow: hidden;
+    margin: 24px 0;
+  }
+
+  .prompt-header {
+    background: rgba(0,229,160,0.08);
+    border-bottom: 1px solid rgba(0,229,160,0.15);
+    padding: 12px 20px;
+    font-size: 11px; color: var(--accent);
+    letter-spacing: 0.12em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .prompt-header::before { content: '›_'; font-weight: 700; }
+
+  .prompt-body {
+    padding: 24px;
+    font-size: 13px; color: var(--text2);
+    line-height: 1.9;
+    white-space: pre-wrap;
+  }
+
+  /* ── COMPARISON ── */
+  .comparison-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+
+  @media (max-width: 900px) {
+    .comparison-grid { grid-template-columns: 1fr; }
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    overflow: hidden;
+  }
+
+  .compare-card-header {
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px; font-weight: 700;
+  }
+
+  .compare-card.highlight .compare-card-header {
+    background: var(--accent-dim);
+    border-color: rgba(0,229,160,0.2);
+    color: var(--accent);
+  }
+
+  .compare-card-body { padding: 20px 22px; }
+  .compare-card-body p { font-size: 13px; }
+
+  /* ── QUOTE ── */
+  .quote-block {
+    border-left: 3px solid var(--accent);
+    padding: 20px 28px;
+    margin: 32px 0;
+    background: var(--accent-dim);
+    border-radius: 0 var(--r) var(--r) 0;
+  }
+
+  .quote-block p {
+    font-family: 'Instrument Serif', serif;
+    font-size: 20px; font-style: italic;
+    color: var(--text); line-height: 1.5; margin-bottom: 0;
+  }
+
+  /* ── PILLARS ── */
+  .pillars {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 2px; margin: 28px 0;
+  }
+
+  @media (max-width: 900px) {
+    .pillars { grid-template-columns: 1fr; }
+  }
+
+  .pillar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 32px 24px;
+    text-align: center;
+    position: relative; overflow: hidden;
+    transition: all 0.2s;
+  }
+
+  .pillar:first-child { border-radius: var(--r) 0 0 var(--r); }
+  .pillar:last-child { border-radius: 0 var(--r) var(--r) 0; }
+
+  .pillar:hover { background: var(--surface2); border-color: var(--border2); }
+
+  .pillar-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 48px; font-weight: 800;
+    color: var(--border2); line-height: 1;
+    margin-bottom: 16px;
+    transition: color 0.2s;
+  }
+
+  .pillar:hover .pillar-num { color: var(--accent); opacity: 0.3; }
+
+  .pillar h3 { font-size: 16px; margin-bottom: 8px; }
+  .pillar p { font-size: 12px; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* ── MOBILE ── */
+  @media (max-width: 768px) {
+    nav { transform: translateX(-100%); }
+    main { margin-left: 0; }
+    .hero { padding: 60px 24px; }
+    section { padding: 60px 24px; }
+    .card-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 48px 72px;
+    margin-left: 0;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+  }
+
+  footer p { font-size: 12px; color: var(--text3); margin: 0; }
+  footer .footer-badge {
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: 3px; padding: 6px 14px;
+    font-size: 11px; color: var(--accent);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ── INLINE CODE ── */
+  code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 7px;
+    font-size: 12px; color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── TWO COL ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ SIDEBAR NAV ═══════════ -->
+<nav id="sidebar">
+  <div class="nav-logo">
+    <div class="logo-badge">
+      <span class="logo-dot"></span>
+      <span class="logo-text">LLM-First</span>
+    </div>
+    <div class="version">Architecture · v0.1 · 2025</div>
+  </div>
+
+  <div class="nav-section-label">Manifesto</div>
+  <a href="#hero"><span class="nav-num">—</span>Introdução</a>
+  <a href="#problema"><span class="nav-num">01</span>O Problema</a>
+  <a href="#metodo"><span class="nav-num">02</span>O Método</a>
+  <a href="#principios"><span class="nav-num">03</span>Princípios</a>
+
+  <div class="nav-section-label" style="margin-top:12px">Arquitetura</div>
+  <a href="#estrutura"><span class="nav-num">04</span>Estrutura de Pastas</a>
+  <a href="#context"><span class="nav-num">05</span>Sistema CONTEXT.md</a>
+  <a href="#anatomia"><span class="nav-num">06</span>Anatomia dos Arquivos</a>
+  <a href="#fluxo"><span class="nav-num">07</span>Fluxo de Dependência</a>
+
+  <div class="nav-section-label" style="margin-top:12px">Protocolo</div>
+  <a href="#protocolo"><span class="nav-num">08</span>Protocolo de Sessão</a>
+  <a href="#llm-guide"><span class="nav-num">09</span>Guia para a LLM</a>
+  <a href="#prompt"><span class="nav-num">10</span>Prompt Padrão</a>
+
+  <div class="nav-section-label" style="margin-top:12px">Visão</div>
+  <a href="#comparacao"><span class="nav-num">11</span>Comparações</a>
+  <a href="#roadmap"><span class="nav-num">12</span>Roadmap</a>
+  <a href="#anti-padroes"><span class="nav-num">13</span>Anti-Padrões</a>
+  <a href="#exemplo-sessao"><span class="nav-num">14</span>Sessão End-to-End</a>
+  <a href="#limites"><span class="nav-num">15</span>Limites do Método</a>
+  <a href="#origem"><span class="nav-num">16</span>A Origem</a>
+  <a href="#autor"><span class="nav-num">—</span>Autor &amp; Inspiração</a>
+
+  <div class="nav-footer">
+    <p>Documento vivo.<br>Atualize conforme o método evolui.</p>
+  </div>
+</nav>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<main>
+
+  <!-- HERO -->
+  <div class="hero" id="hero">
+    <div class="hero-grid-bg"></div>
+    <div class="hero-tag">Manifesto Técnico · v0.1</div>
+    <h1>
+      LLM-First
+      <span class="line-accent">Architecture</span>
+      <span class="line-dim">uma arquitetura pensada para ser mantida por IA</span>
+    </h1>
+    <p class="hero-sub">
+      Um método de organização de projetos web backend que prioriza a legibilidade por agentes de IA —
+      sem sacrificar boas práticas de engenharia de software.
+      Não é um framework. É um <strong>protocolo de organização e documentação</strong>.
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="label">Status</span>
+        <span class="value">Em desenvolvimento</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="label">Versão</span>
+        <span class="value">0.1 — Rascunho</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="label">Stack</span>
+        <span class="value">Agnóstico de framework</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="label">Foco</span>
+        <span class="value">AI-Assisted Development</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEÇÃO 01 — O PROBLEMA -->
+  <section id="problema">
+    <div class="section-header">
+      <div class="section-num">01</div>
+      <div class="section-title-block">
+        <div class="section-tag">O Problema que Este Método Resolve</div>
+        <h2>A memória que se perde entre sessões</h2>
+      </div>
+    </div>
+
+    <div class="two-col" style="margin-bottom:40px">
+      <div>
+        <h3>O problema da memória perdida</h3>
+        <p>Quando uma LLM é usada para manter um projeto ao longo do tempo, ela enfrenta um problema estrutural grave: <strong>ela não tem memória entre sessões</strong>. Isso cria um ciclo destrutivo que degrada o projeto progressivamente.</p>
+        <p>O desenvolvedor que usa IA como assistente passa cada vez mais tempo <strong>corrigindo inconsistências</strong> e cada vez menos tempo criando valor.</p>
+      </div>
+      <div>
+        <h3>O problema da ambiguidade</h3>
+        <p>Mesmo dentro de uma única sessão, uma LLM enfrenta ambiguidade quando a estrutura do projeto não é explícita. Quando a estrutura não diz claramente <em>onde cada coisa deve viver</em>, a IA adivinha.</p>
+        <p>E adivinhações acumuladas ao longo de sessões <strong>destroem a coesão do projeto</strong>.</p>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">ciclo-destrutivo.txt</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold">Sessão 1</span>  <span class="c-dim">→</span>  <span class="c-green">LLM entende o projeto do zero, toma boas decisões</span>
+<span class="c-gold">Sessão 2</span>  <span class="c-dim">→</span>  <span class="c-blue">LLM reaprende parcialmente, decisões levemente inconsistentes</span>
+<span class="c-gold">Sessão 3</span>  <span class="c-dim">→</span>  <span class="c-red">LLM contradiz decisões anteriores sem saber</span>
+<span class="c-gold">Sessão N</span>  <span class="c-dim">→</span>  <span class="c-red">Código vira uma colcha de retalhos incoerente</span></pre>
+      </div>
+    </div>
+
+    <div class="quote-block" style="margin-top:40px">
+      <p>"O futuro do desenvolvimento assistido por IA não está nos modelos mais poderosos. Está na qualidade do contexto que fornecemos a eles."</p>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 02 — O MÉTODO -->
+  <section id="metodo">
+    <div class="section-header">
+      <div class="section-num">02</div>
+      <div class="section-title-block">
+        <div class="section-tag">O que é</div>
+        <h2>LLM-First Architecture</h2>
+      </div>
+    </div>
+
+    <p>LLM-First Architecture resolve os dois problemas com uma abordagem dupla: <strong>estrutura de pastas previsível</strong> onde cada camada tem responsabilidade única e explícita, e <strong>documentação viva por camada</strong> onde cada pasta carrega seu próprio contexto técnico em um arquivo <code>CONTEXT.md</code>.</p>
+
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pillar-num">01</div>
+        <h3>Estrutura Previsível</h3>
+        <p>Onde cada arquivo vive e o que faz — sem ambiguidade</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-num">02</div>
+        <h3>Contexto Vivo</h3>
+        <p>CONTEXT.md em cada pasta explica responsabilidades e restrições</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-num">03</div>
+        <h3>Protocolo de Sessão</h3>
+        <p>Como a LLM inicia, age e encerra cada sessão com disciplina</p>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:40px">
+      <table>
+        <thead>
+          <tr>
+            <th>Aspecto</th>
+            <th>Arquitetura Convencional</th>
+            <th>LLM-First Architecture</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Documentação</td><td>Para humanos lerem</td><td>Para LLMs lerem antes de agir</td></tr>
+          <tr><td>Estrutura</td><td>Otimizada para o framework</td><td>Otimizada para previsibilidade</td></tr>
+          <tr><td>Contexto</td><td>Implícito no histórico do dev</td><td>Explícito em arquivos .md</td></tr>
+          <tr><td>Manutenção</td><td>Humano guia, IA executa</td><td>IA age com autonomia controlada</td></tr>
+          <tr><td>Ambiguidade</td><td>Tolerada por convenção</td><td>Eliminada por definição explícita</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 03 — PRINCÍPIOS -->
+  <section id="principios">
+    <div class="section-header">
+      <div class="section-num">03</div>
+      <div class="section-title-block">
+        <div class="section-tag">As regras que tornam o método funcional</div>
+        <h2>Princípios Fundamentais</h2>
+      </div>
+    </div>
+
+    <p style="margin-bottom:32px">Todo projeto que segue LLM-First Architecture deve respeitar os seguintes princípios. Eles não são sugestões — são as regras que tornam o método funcional.</p>
+
+    <div class="principle-list">
+      <div class="principle">
+        <div class="principle-num">1</div>
+        <div class="principle-body">
+          <h3>Responsabilidade Única por Arquivo</h3>
+          <p>Cada arquivo tem uma responsabilidade clara e nomeada. Um arquivo de rotas não contém lógica de negócio. Essa separação é o que permite à LLM saber onde agir sem ambiguidade.</p>
+        </div>
+      </div>
+      <div class="principle">
+        <div class="principle-num">2</div>
+        <div class="principle-body">
+          <h3>Dependência Unidirecional</h3>
+          <p>As camadas se comunicam em uma única direção: de fora para dentro. Nenhuma camada interna conhece as externas. O projeto se torna um grafo acíclico de dependências — previsível por definição.</p>
+        </div>
+      </div>
+      <div class="principle">
+        <div class="principle-num">3</div>
+        <div class="principle-body">
+          <h3>Core Imutável</h3>
+          <p>O <code>core/</code> é o núcleo que sustenta tudo. Modificá-lo é uma decisão de arquitetura. Uma LLM <strong>nunca</strong> deve modificar o core para implementar uma feature.</p>
+        </div>
+      </div>
+      <div class="principle">
+        <div class="principle-num">4</div>
+        <div class="principle-body">
+          <h3>Contexto Explícito</h3>
+          <p>Nenhuma decisão de arquitetura deve existir apenas na cabeça do desenvolvedor. Toda decisão relevante é documentada no <code>CONTEXT.md</code> da camada afetada. O que não está documentado não existe para a LLM.</p>
+        </div>
+      </div>
+      <div class="principle">
+        <div class="principle-num">5</div>
+        <div class="principle-body">
+          <h3>Documentação como Contrato</h3>
+          <p>O <code>CONTEXT.md</code> define o que pode, o que deve e o que <strong>não pode</strong> acontecer naquela camada. Uma LLM que viola o contrato está cometendo um erro arquitetural — mesmo que o código funcione.</p>
+        </div>
+      </div>
+      <div class="principle">
+        <div class="principle-num">6</div>
+        <div class="principle-body">
+          <h3>Atualização Obrigatória</h3>
+          <p>Toda modificação feita no código <strong>deve</strong> ser refletida no <code>CONTEXT.md</code> da pasta afetada antes do encerramento da sessão. Documentação desatualizada é pior que ausência de documentação.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 04 — ESTRUTURA -->
+  <section id="estrutura">
+    <div class="section-header">
+      <div class="section-num">04</div>
+      <div class="section-title-block">
+        <div class="section-tag">Universal · Agnóstica de Framework</div>
+        <h2>Estrutura de Pastas</h2>
+      </div>
+    </div>
+
+    <p>Projetada para projetos web backend de qualquer porte e stack. Os nomes das pastas e suas responsabilidades se mantêm independentemente da tecnologia usada.</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">project-root/</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-blue">project-root/</span>
+<span class="c-dim">│</span>
+<span class="c-dim">├── </span><span class="c-green">CONTEXT.md</span>                  <span class="c-dim">← Visão geral do projeto inteiro (raiz)</span>
+<span class="c-dim">├── </span><span class="c-white">.env.example</span>                <span class="c-dim">← Variáveis de ambiente documentadas</span>
+<span class="c-dim">├── </span><span class="c-white">requirements.txt</span>            <span class="c-dim">← Dependências</span>
+<span class="c-dim">│</span>
+<span class="c-dim">└── </span><span class="c-blue">app/</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-white">main.py</span>                 <span class="c-dim">← Entrypoint: routers, middlewares</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">core/</span>                   <span class="c-dim">← Coração da aplicação</span>
+<span class="c-dim">    │   ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">    │   ├── </span><span class="c-white">config.py</span>           <span class="c-dim">← Configurações e variáveis de ambiente</span>
+<span class="c-dim">    │   ├── </span><span class="c-white">security.py</span>         <span class="c-dim">← Autenticação, autorização, criptografia</span>
+<span class="c-dim">    │   └── </span><span class="c-white">database.py</span>         <span class="c-dim">← Conexão, sessão, base declarativa</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">api/</span>                    <span class="c-dim">← Camada de entrada HTTP (rotas apenas)</span>
+<span class="c-dim">    │   ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">    │   ├── </span><span class="c-white">auth.py</span>
+<span class="c-dim">    │   └── </span><span class="c-white">[dominio].py</span>        <span class="c-dim">← Um arquivo por domínio de negócio</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">services/</span>               <span class="c-dim">← Lógica de negócio (sem conhecer HTTP)</span>
+<span class="c-dim">    │   ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">    │   ├── </span><span class="c-white">auth_service.py</span>
+<span class="c-dim">    │   └── </span><span class="c-white">[dominio]_service.py</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">models/</span>                 <span class="c-dim">← Entidades do banco de dados (ORM)</span>
+<span class="c-dim">    │   ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">    │   └── </span><span class="c-white">[entidade].py</span>       <span class="c-dim">← Um arquivo por entidade principal</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">schemas/</span>                <span class="c-dim">← Contratos de entrada e saída</span>
+<span class="c-dim">    │   ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">    │   └── </span><span class="c-white">[dominio]_schema.py</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">templates/</span>              <span class="c-dim">← HTML renderizado pelo servidor</span>
+<span class="c-dim">    │   ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">    │   ├── </span><span class="c-white">base.html</span>
+<span class="c-dim">    │   └── </span><span class="c-white">[dominio]/</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    ├── </span><span class="c-gold">static/</span>                 <span class="c-dim">← Assets estáticos (CSS, JS, img)</span>
+<span class="c-dim">    │</span>
+<span class="c-dim">    └── </span><span class="c-gold">utils/</span>                  <span class="c-dim">← Helpers reutilizáveis sem estado</span>
+<span class="c-dim">        ├── </span><span class="c-green">CONTEXT.md</span>
+<span class="c-dim">        ├── </span><span class="c-white">email.py</span>
+<span class="c-dim">        ├── </span><span class="c-white">formatters.py</span>
+<span class="c-dim">        └── </span><span class="c-white">validators.py</span></pre>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:32px">
+      <table>
+        <thead>
+          <tr><th>Camada</th><th>Pergunta que responde</th><th>Responsabilidade</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>api/</td><td>Como a requisição chega?</td><td>Recebe, valida e delega</td></tr>
+          <tr><td>services/</td><td>O que a aplicação faz?</td><td>Toda a lógica de negócio</td></tr>
+          <tr><td>models/</td><td>Como os dados são estruturados?</td><td>Entidades ORM</td></tr>
+          <tr><td>schemas/</td><td>O que entra e o que sai?</td><td>Contratos de entrada/saída</td></tr>
+          <tr><td>core/</td><td>Como tudo se conecta?</td><td>Config, segurança, banco</td></tr>
+          <tr><td>templates/</td><td>Como o usuário vê?</td><td>HTML renderizado</td></tr>
+          <tr><td>utils/</td><td>Funções auxiliares?</td><td>Helpers puros sem estado</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 05 — CONTEXT.MD -->
+  <section id="context">
+    <div class="section-header">
+      <div class="section-num">05</div>
+      <div class="section-title-block">
+        <div class="section-tag">O elemento central do método</div>
+        <h2>Sistema CONTEXT.md</h2>
+      </div>
+    </div>
+
+    <p>O <code>CONTEXT.md</code> é o elemento mais inovador do LLM-First Architecture. Ele transforma cada pasta em uma unidade <strong>autossuficiente de contexto</strong> — a memória persistente daquela camada da aplicação.</p>
+
+    <div class="card-grid" style="margin: 32px 0">
+      <div class="card">
+        <span class="card-icon">📋</span>
+        <h3>O que existe aqui?</h3>
+        <p>Lista dos arquivos com descrição de uma linha — o que cada um faz e como.</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">🔧</span>
+        <h3>Como foi implementado?</h3>
+        <p>Decisões técnicas e suas justificativas — libs usadas, padrões adotados.</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">⛔</span>
+        <h3>O que NÃO fazer aqui?</h3>
+        <p>Restrições explícitas — o elemento mais valioso para LLMs. Elimina erros arquiteturais.</p>
+      </div>
+      <div class="card">
+        <span class="card-icon">📅</span>
+        <h3>O que mudou recentemente?</h3>
+        <p>Changelog por camada — a LLM lê e sabe o estado atual sem precisar do git log.</p>
+      </div>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 28px; margin-top: 16px;">
+      <h4 style="margin-bottom: 16px">Por que restrições explícitas são o elemento mais valioso</h4>
+      <p>Documentar <strong>o que não deve ser feito</strong> é mais valioso do que documentar o que deve. Uma LLM que sabe que <code>core/security.py</code> não deve acessar o banco de dados nunca vai cometer esse erro — mesmo que tecnicamente seja possível.</p>
+      <p style="margin-bottom:0">Restrições explícitas eliminam a categoria de erros mais difícil de detectar: o <em>código que funciona mas está no lugar errado</em>.</p>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 06 — ANATOMIA -->
+  <section id="anatomia">
+    <div class="section-header">
+      <div class="section-num">06</div>
+      <div class="section-title-block">
+        <div class="section-tag">Templates completos</div>
+        <h2>Anatomia do CONTEXT.md</h2>
+      </div>
+    </div>
+
+    <p>Existem dois tipos de <code>CONTEXT.md</code>: o <strong>raiz</strong> (mapa do projeto inteiro) e os <strong>de subpasta</strong> (contrato técnico de cada camada).</p>
+
+    <!-- RAIZ -->
+    <h3 style="margin: 36px 0 16px">6.1 — CONTEXT.md Raiz</h3>
+    <p>O primeiro arquivo que uma LLM deve ler ao iniciar qualquer sessão. Responde: <em>"Qual é este projeto, como está organizado e quais são as regras globais?"</em></p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">CONTEXT.md — Raiz</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold"># [Nome do Projeto] — CONTEXT.md Raiz</span>
+
+<span class="c-green">## Identidade do Projeto</span>
+<span class="c-dim">- **Nome:** [nome]</span>
+<span class="c-dim">- **Tipo:** API REST / Web App / Híbrido</span>
+<span class="c-dim">- **Stack principal:** [linguagem + framework + banco]</span>
+<span class="c-dim">- **Autenticação:** [JWT / OAuth2 / Session]</span>
+<span class="c-dim">- **Versão atual:** [v0.x]</span>
+
+<span class="c-green">## Estrutura de Camadas</span>
+
+<span class="c-dim">| Pasta       | Responsabilidade                          |</span>
+<span class="c-dim">|-------------|-------------------------------------------|</span>
+<span class="c-blue">| `core/`     </span><span class="c-dim">| Configuração, segurança, banco            |</span>
+<span class="c-blue">| `api/`      </span><span class="c-dim">| Rotas HTTP — recebe, valida e delega      |</span>
+<span class="c-blue">| `services/` </span><span class="c-dim">| Lógica de negócio — não conhece HTTP     |</span>
+<span class="c-blue">| `models/`   </span><span class="c-dim">| Entidades ORM — espelho do banco          |</span>
+<span class="c-blue">| `schemas/`  </span><span class="c-dim">| Contratos Pydantic de entrada e saída     |</span>
+
+<span class="c-green">## Regra de Dependência Global</span>
+
+<span class="c-white">api/ → services/ → models/ + schemas/</span>
+<span class="c-white">            ↓</span>
+<span class="c-white">          core/</span>
+
+<span class="c-dim">Nenhuma camada importa de uma camada acima dela.</span>
+
+<span class="c-green">## Restrições Globais</span>
+
+<span class="c-red">⛔ Nunca colocar lógica de negócio em api/</span>
+<span class="c-red">⛔ Nunca importar de api/ ou services/ dentro de core/</span>
+<span class="c-red">⛔ Nunca acessar o banco diretamente em api/</span>
+<span class="c-red">⛔ Nunca hardcodar segredos no código</span>
+
+<span class="c-green">## Histórico de Decisões</span>
+
+<span class="c-dim">| Data       | Decisão                  | Motivo              |</span>
+<span class="c-dim">|------------|--------------------------|---------------------|</span>
+<span class="c-dim">| AAAA-MM-DD | Estrutura inicial criada | Início do projeto   |</span></pre>
+      </div>
+    </div>
+
+    <!-- SUBPASTA -->
+    <h3 style="margin: 40px 0 16px">6.2 — CONTEXT.md de Subpasta (template universal)</h3>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">CONTEXT.md — Template de Subpasta</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold"># [nome-da-pasta]/ — CONTEXT.md</span>
+
+<span class="c-green">## Responsabilidade</span>
+<span class="c-dim">[Uma frase: o que esta camada faz e o que ela NÃO faz]</span>
+
+<span class="c-green">## Arquivos</span>
+
+<span class="c-dim">| Arquivo       | O que faz           | Como faz              |</span>
+<span class="c-dim">|---------------|---------------------|-----------------------|</span>
+<span class="c-dim">| `arquivo.py`  | [responsabilidade]  | [lib/padrão usado]    |</span>
+
+<span class="c-green">## Dependências que esta camada PODE importar</span>
+
+<span class="c-dim">- `core/config.py`   — configurações globais</span>
+<span class="c-dim">- `core/security.py` — funções de autenticação</span>
+<span class="c-dim">- [outras dependências permitidas]</span>
+
+<span class="c-green">## O que esta camada NÃO deve fazer</span>
+
+<span class="c-red">⛔ [restrição 1]</span>
+<span class="c-red">⛔ [restrição 2]</span>
+<span class="c-red">⛔ [restrição 3]</span>
+
+<span class="c-green">## Padrões adotados</span>
+<span class="c-dim">[Padrões de código específicos desta camada]</span>
+
+<span class="c-green">## Última atualização</span>
+
+<span class="c-dim">| Data       | Arquivo     | Mudança                    |</span>
+<span class="c-dim">|------------|-------------|----------------------------|</span>
+<span class="c-dim">| AAAA-MM-DD | arquivo.py  | [descrição da mudança]     |</span></pre>
+      </div>
+    </div>
+
+    <!-- EXEMPLO CORE -->
+    <h3 style="margin: 40px 0 16px">6.3 — Exemplo real: core/CONTEXT.md</h3>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">app/core/CONTEXT.md</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold"># core/ — CONTEXT.md</span>
+
+<span class="c-green">## Responsabilidade</span>
+<span class="c-white">Sustenta toda a aplicação. Não conhece nenhuma outra camada do projeto.</span>
+
+<span class="c-green">## Arquivos</span>
+
+<span class="c-dim">| Arquivo        | O que faz                              | Como faz                    |</span>
+<span class="c-dim">|----------------|----------------------------------------|-----------------------------|</span>
+<span class="c-blue">| config.py      </span><span class="c-dim">| Carrega e valida variáveis de ambiente | pydantic-settings           |</span>
+<span class="c-blue">| security.py    </span><span class="c-dim">| JWT, hash de senha, verificação        | python-jose, passlib        |</span>
+<span class="c-blue">| database.py    </span><span class="c-dim">| Engine, sessão e base declarativa      | SQLAlchemy 2.0, get_db()    |</span>
+
+<span class="c-green">## Dependências PERMITIDAS</span>
+<span class="c-dim">- Apenas bibliotecas externas (pydantic, sqlalchemy, jose, passlib)</span>
+<span class="c-red">⛔ Nunca importar de api/, services/, models/ ou schemas/</span>
+
+<span class="c-green">## O que esta camada NÃO deve fazer</span>
+
+<span class="c-red">⛔ Não contém rotas HTTP</span>
+<span class="c-red">⛔ Não contém lógica de negócio</span>
+<span class="c-red">⛔ security.py não acessa o banco de dados</span>
+<span class="c-red">⛔ Nunca instanciar Settings fora de config.py</span>
+
+<span class="c-green">## Última atualização</span>
+
+<span class="c-dim">| Data       | Arquivo     | Mudança                               |</span>
+<span class="c-dim">|------------|-------------|---------------------------------------|</span>
+<span class="c-dim">| AAAA-MM-DD | security.py | Adicionado suporte a refresh token    |</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 07 — FLUXO -->
+  <section id="fluxo">
+    <div class="section-header">
+      <div class="section-num">07</div>
+      <div class="section-title-block">
+        <div class="section-tag">A espinha dorsal do método</div>
+        <h2>Fluxo de Dependência</h2>
+      </div>
+    </div>
+
+    <p>Entender o fluxo de dependência é entender o método. <strong>Nenhuma camada importa de uma camada acima dela.</strong> Se <code>core/</code> precisar de algo que está em <code>services/</code>, a arquitetura está errada.</p>
+
+    <div class="diagram">
+      <div class="diagram-flow">
+        <div class="diagram-box">
+          <div class="box-label">HTTP Request</div>
+          <div class="box-desc">Entrada do sistema — protocolo externo</div>
+        </div>
+        <div class="diagram-arrow"><span>↓</span></div>
+        <div class="diagram-box">
+          <div class="box-tag">api/</div>
+          <div class="box-label">Camada de Roteamento</div>
+          <div class="box-desc">Recebe → Valida com schemas → Delega para services<br><span style="color:var(--accent);font-size:11px">Conhece: services/, schemas/, core/ (apenas DI)</span></div>
+        </div>
+        <div class="diagram-arrow"><span>↓</span></div>
+        <div class="diagram-box">
+          <div class="box-tag">services/</div>
+          <div class="box-label">Lógica de Negócio</div>
+          <div class="box-desc">Aplica regras → Usa models → Retorna dados<br><span style="color:var(--accent);font-size:11px">Conhece: models/, schemas/, core/</span></div>
+        </div>
+        <div class="diagram-arrow"><span>↓</span></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; max-width:560px">
+          <div class="diagram-box">
+            <div class="box-tag">models/</div>
+            <div class="box-label">Entidades ORM</div>
+            <div class="box-desc">Espelho do banco de dados</div>
+          </div>
+          <div class="diagram-box">
+            <div class="box-tag">schemas/</div>
+            <div class="box-label">Contratos</div>
+            <div class="box-desc">Entrada e saída tipados</div>
+          </div>
+        </div>
+        <div class="diagram-arrow"><span>↓</span></div>
+        <div class="diagram-box" style="border-color: var(--accent); background: var(--accent-dim)">
+          <div class="box-tag" style="background: var(--accent)">core/</div>
+          <div class="box-label">Infraestrutura</div>
+          <div class="box-desc">config.py / security.py / database.py<br><span style="color:var(--accent);font-size:11px">Não conhece ninguém acima — apenas libs externas</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:32px">
+      <table>
+        <thead>
+          <tr><th>Situação</th><th>A LLM vai para...</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Adicionar campo no banco</td><td>models/</td></tr>
+          <tr><td>Nova regra de negócio</td><td>services/</td></tr>
+          <tr><td>Novo endpoint</td><td>api/</td></tr>
+          <tr><td>Validar input/output</td><td>schemas/</td></tr>
+          <tr><td>Mudar layout HTML</td><td>templates/</td></tr>
+          <tr><td>Configurar JWT</td><td>core/security.py</td></tr>
+          <tr><td>Trocar banco de dados</td><td>core/database.py</td></tr>
+          <tr><td>Nova variável de ambiente</td><td>core/config.py</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 08 — PROTOCOLO -->
+  <section id="protocolo">
+    <div class="section-header">
+      <div class="section-num">08</div>
+      <div class="section-title-block">
+        <div class="section-tag">Disciplina que sustenta o método</div>
+        <h2>Protocolo de Atualização</h2>
+      </div>
+    </div>
+
+    <p>O método só funciona com disciplina. O Protocolo define o comportamento esperado de qualquer agente — humano ou IA — que modifica o projeto.</p>
+
+    <div class="two-col" style="margin-top:36px">
+      <div>
+        <h4>Ao iniciar uma sessão</h4>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Ler CONTEXT.md da raiz</h4><p>Entender o projeto, stack e regras globais</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Identificar pastas afetadas</h4><p>Quais camadas a tarefa vai tocar?</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Ler CONTEXT.md de cada pasta</h4><p>Entender restrições antes de agir</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Confirmar entendimento</h4><p>Antes de escrever qualquer código</p></div></div>
+        </div>
+      </div>
+      <div>
+        <h4>Ao encerrar uma sessão</h4>
+        <div class="steps">
+          <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Atualizar tabela de arquivos</h4><p>Novos arquivos criados ou removidos</p></div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Atualizar restrições</h4><p>Se algo novo foi descoberto durante a sessão</p></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Registrar no histórico</h4><p>Data + arquivo + descrição da mudança</p></div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Verificar CONTEXT.md raiz</h4><p>Decisões arquiteturais mudaram?</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin: 40px 0 16px">Gatilhos obrigatórios de atualização</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Evento</th><th>CONTEXT.md a atualizar</th></tr></thead>
+        <tbody>
+          <tr><td>Novo arquivo criado</td><td>Pasta onde foi criado</td></tr>
+          <tr><td>Arquivo removido</td><td>Pasta onde estava</td></tr>
+          <tr><td>Nova dependência adicionada</td><td>Pasta + raiz (se global)</td></tr>
+          <tr><td>Nova restrição descoberta</td><td>Pasta afetada</td></tr>
+          <tr><td>Nova variável de ambiente</td><td>Raiz</td></tr>
+          <tr><td>Mudança de decisão arquitetural</td><td>Raiz + pasta afetada</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 09 — GUIA LLM -->
+  <section id="llm-guide">
+    <div class="section-header">
+      <div class="section-num">09</div>
+      <div class="section-title-block">
+        <div class="section-tag">Escrito para a IA</div>
+        <h2>Guia para a LLM</h2>
+      </div>
+    </div>
+
+    <p>Esta seção é escrita <strong>para a LLM</strong> — é o guia de comportamento esperado de qualquer agente que opere em um projeto LLM-First.</p>
+
+    <div class="card-grid" style="margin: 32px 0">
+      <div class="card">
+        <h4>Antes de qualquer ação</h4>
+        <div class="restriction-box"><span class="icon">→</span> SEMPRE ler o CONTEXT.md da raiz primeiro</div>
+        <div class="restriction-box"><span class="icon">→</span> SEMPRE ler o CONTEXT.md da pasta afetada</div>
+        <div class="restriction-box"><span class="icon">→</span> NUNCA assumir o que uma camada faz sem ler</div>
+      </div>
+      <div class="card">
+        <h4>Ao criar um novo arquivo</h4>
+        <div class="restriction-box" style="background:rgba(0,229,160,0.06);border-color:rgba(0,229,160,0.2)"><span class="icon" style="color:var(--accent)">→</span> Identificar em qual camada pertence</div>
+        <div class="restriction-box" style="background:rgba(0,229,160,0.06);border-color:rgba(0,229,160,0.2)"><span class="icon" style="color:var(--accent)">→</span> Verificar se já existe algo similar</div>
+        <div class="restriction-box" style="background:rgba(0,229,160,0.06);border-color:rgba(0,229,160,0.2)"><span class="icon" style="color:var(--accent)">→</span> Atualizar CONTEXT.md após criar</div>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom: 16px">Árvore de decisão para ambiguidade</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">onde-colocar.decision-tree</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold">Se não souber onde um código deve viver:</span>
+
+<span class="c-white">1.</span> <span class="c-blue">Esse código conhece HTTP?</span>
+   <span class="c-dim">└─ Sim → pertence a</span> <span class="c-green">api/</span>
+
+<span class="c-white">2.</span> <span class="c-blue">Esse código é uma regra de negócio?</span>
+   <span class="c-dim">└─ Sim → pertence a</span> <span class="c-green">services/</span>
+
+<span class="c-white">3.</span> <span class="c-blue">Esse código é uma função pura sem estado?</span>
+   <span class="c-dim">└─ Sim → pertence a</span> <span class="c-green">utils/</span>
+
+<span class="c-white">4.</span> <span class="c-blue">Esse código define a estrutura do banco?</span>
+   <span class="c-dim">└─ Sim → pertence a</span> <span class="c-green">models/</span>
+
+<span class="c-white">5.</span> <span class="c-blue">Esse código valida entrada ou define saída?</span>
+   <span class="c-dim">└─ Sim → pertence a</span> <span class="c-green">schemas/</span>
+
+<span class="c-red">Ainda há dúvida? → Reportar ao desenvolvedor antes de agir.</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 10 — PROMPT -->
+  <section id="prompt">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <div class="section-title-block">
+        <div class="section-tag">Para ativar o método em qualquer sessão</div>
+        <h2>Prompt Padrão de Sessão</h2>
+      </div>
+    </div>
+
+    <p>Use este prompt no início de qualquer sessão com uma LLM para ativar o protocolo LLM-First Architecture.</p>
+
+    <div class="prompt-box">
+      <div class="prompt-header">Prompt de Abertura de Sessão</div>
+      <div class="prompt-body">Você está operando em um projeto que segue o LLM-First Architecture.
+
+Antes de qualquer ação:
+1. Leia o CONTEXT.md da raiz do projeto
+2. Leia o CONTEXT.md de cada pasta que será afetada pela tarefa
+3. Respeite as restrições declaradas em cada CONTEXT.md
+4. Ao encerrar, atualize os CONTEXT.md das pastas modificadas
+
+Regras globais:
+- Nunca coloque lógica de negócio em api/
+- Nunca importe de uma camada acima no fluxo de dependência
+- Nunca modifique core/ para implementar uma feature
+- Nunca encerre a sessão sem atualizar os CONTEXT.md afetados
+
+Tarefa: [descreva o que precisa ser feito]</div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 11 — COMPARAÇÃO -->
+  <section id="comparacao">
+    <div class="section-header">
+      <div class="section-num">11</div>
+      <div class="section-title-block">
+        <div class="section-tag">Contexto no ecossistema</div>
+        <h2>Comparações</h2>
+      </div>
+    </div>
+
+    <div class="comparison-grid" style="margin-bottom:32px">
+      <div class="compare-card">
+        <div class="compare-card-header">MVC Tradicional</div>
+        <div class="compare-card-body">
+          <p>Separação em Model, View, Controller. Controller tende a acumular lógica. Documentação é externa ao código. Decisões são implícitas no histórico.</p>
+        </div>
+      </div>
+      <div class="compare-card highlight">
+        <div class="compare-card-header">LLM-First Architecture</div>
+        <div class="compare-card-body">
+          <p>Camadas adicionais (services, schemas) isolam a lógica de negócio. Documentação é embutida em cada camada. Decisões são explícitas e auditáveis.</p>
+        </div>
+      </div>
+      <div class="compare-card">
+        <div class="compare-card-header">Clean Architecture</div>
+        <div class="compare-card-body">
+          <p>Alta complexidade com muitas camadas e interfaces. Curva de aprendizado íngreme. Não prescreve documentação. Foco em independência de frameworks.</p>
+        </div>
+      </div>
+      <div class="compare-card highlight">
+        <div class="compare-card-header">LLM-First Architecture</div>
+        <div class="compare-card-body">
+          <p>Complexidade moderada sem over-engineering. Curva suave. Documentação é central ao método. Foco em legibilidade por agentes de IA.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom:16px">Quando usar LLM-First</h3>
+    <div class="card-grid">
+      <div class="card"><span class="card-icon">🤖</span><h3>Projetos com IA recorrente</h3><p>Mantidos com assistência de IA de forma contínua ao longo do tempo.</p></div>
+      <div class="card"><span class="card-icon">👥</span><h3>Times pequenos</h3><p>Onde a IA é um colaborador real e o contexto precisa ser compartilhado.</p></div>
+      <div class="card"><span class="card-icon">📅</span><h3>Projetos de longo prazo</h3><p>Onde consistência arquitetural ao longo do tempo é crítica.</p></div>
+      <div class="card"><span class="card-icon">🔄</span><h3>Alta rotatividade de contexto</h3><p>Múltiplos desenvolvedores, múltiplas ferramentas de IA, múltiplas sessões.</p></div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 12 — ROADMAP -->
+  <section id="roadmap">
+    <div class="section-header">
+      <div class="section-num">12</div>
+      <div class="section-title-block">
+        <div class="section-tag">O que vem a seguir</div>
+        <h2>Roadmap e Visão Futura</h2>
+      </div>
+    </div>
+
+    <p>LLM-First Architecture é um método em evolução. O que foi definido aqui é o núcleo conceitual. A visão de longo prazo é mais ambiciosa.</p>
+
+    <div class="roadmap" style="margin-top: 36px">
+      <div class="roadmap-item active">
+        <div class="roadmap-dot">v0.1</div>
+        <div class="roadmap-content">
+          <h3>Método — atual</h3>
+          <p>Definição do núcleo conceitual, estrutura e protocolo.</p>
+          <div class="roadmap-tasks">
+            <div class="roadmap-task done">Estrutura de pastas universal definida</div>
+            <div class="roadmap-task done">Sistema CONTEXT.md documentado</div>
+            <div class="roadmap-task done">Templates por camada criados</div>
+            <div class="roadmap-task done">Protocolo de atualização definido</div>
+            <div class="roadmap-task done">Prompt padrão de sessão</div>
+          </div>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot">v0.2</div>
+        <div class="roadmap-content">
+          <h3>Ferramentas</h3>
+          <p>Automação e suporte ao desenvolvedor.</p>
+          <div class="roadmap-tasks">
+            <div class="roadmap-task">CLI para inicializar projetos LLM-First</div>
+            <div class="roadmap-task">Linter que valida CONTEXT.md vs código</div>
+            <div class="roadmap-task">Template FastAPI pronto para uso</div>
+          </div>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot">v0.3</div>
+        <div class="roadmap-content">
+          <h3>Integração com IDEs</h3>
+          <p>Extensões e hooks para Cursor AI e VS Code.</p>
+          <div class="roadmap-tasks">
+            <div class="roadmap-task">Extensão VS Code com painel CONTEXT.md</div>
+            <div class="roadmap-task">Integração Cursor AI — injeção automática de contexto</div>
+            <div class="roadmap-task">Hook de commit que verifica atualização do CONTEXT.md</div>
+          </div>
+        </div>
+      </div>
+      <div class="roadmap-item">
+        <div class="roadmap-dot">v1.0</div>
+        <div class="roadmap-content">
+          <h3>Agente LLM-First</h3>
+          <p>Agente dedicado que opera exclusivamente sobre projetos LLM-First.</p>
+          <div class="roadmap-tasks">
+            <div class="roadmap-task">Gestão automática de CONTEXT.md</div>
+            <div class="roadmap-task">Detecção de violações arquiteturais em tempo real</div>
+            <div class="roadmap-task">Memória persistente entre sessões</div>
+            <div class="roadmap-task">Framework completo de AI-Assisted Development</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="quote-block" style="margin-top:52px">
+      <p>"LLM-First Architecture parte de uma premissa simples: se a IA vai manter o código, o código precisa ser organizado para ela."</p>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 13 — ANTI-PADRÕES -->
+  <section id="anti-padroes">
+    <div class="section-header">
+      <div class="section-num">13</div>
+      <div class="section-title-block">
+        <div class="section-tag">Os erros mais comuns ao ignorar o método</div>
+        <h2>Anti-Padrões</h2>
+      </div>
+    </div>
+
+    <p>Anti-padrões são os erros mais comuns cometidos quando o método <strong>não</strong> é seguido — ou é seguido apenas parcialmente. Reconhecê-los é tão importante quanto conhecer as boas práticas.</p>
+    <p><strong>Documentação desatualizada é pior que ausência de documentação.</strong></p>
+
+    <div class="card-grid" style="margin-top:32px">
+      <div class="card">
+        <span class="card-icon">⛔</span>
+        <h3>Anti-Padrão 1 — CONTEXT.md desatualizado</h3>
+        <p>O arquivo existe, mas não foi atualizado após a última modificação. A LLM lê, confia e age com base em informação errada — produzindo código inconsistente com o estado real do projeto.</p>
+        <p><strong>Solução:</strong> atualizar o <code>CONTEXT.md</code> é parte da tarefa, não um passo opcional após ela. O encerramento de qualquer sessão só está completo quando os arquivos <code>CONTEXT.md</code> das pastas afetadas estão atualizados.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">⛔</span>
+        <h3>Anti-Padrão 2 — Lógica de negócio em api/</h3>
+        <p>O arquivo de rotas começa a acumular condicionais, cálculos e decisões de domínio. A LLM que recebe uma tarefa nova não sabe se deve colocar a lógica no service ou na rota — e escolhe a rota porque já tem lógica lá.</p>
+        <p>O problema se amplifica a cada sessão até o arquivo de rotas se tornar impossível de manter.</p>
+        <p><strong>Solução:</strong> <code>api/</code> deve ter apenas: receber, validar com schema, chamar o service e retornar resposta. Qualquer <code>if</code> de regra de negócio pertence a <code>services/</code>.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">⛔</span>
+        <h3>Anti-Padrão 3 — core/ modificado para implementar features</h3>
+        <p>Um desenvolvedor pede à LLM para "adicionar validação de e-mail" e ela coloca a lógica em <code>core/security.py</code> porque parece relacionado à segurança. O core agora conhece regras de negócio — e qualquer outra camada que importar o core carrega esse acoplamento junto.</p>
+        <p><strong>Solução:</strong> <code>core/</code> é infraestrutura pura: configuração, conexão com banco e autenticação primitiva. Validações de domínio ficam em <code>services/</code> ou <code>schemas/</code>.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">⛔</span>
+        <h3>Anti-Padrão 4 — utils/ como gaveta de miscellaneous</h3>
+        <p>Com o tempo, <code>utils.py</code> vira um arquivo de 800 linhas com funções sem relação entre si. A LLM não sabe o que está lá sem ler tudo — e passa a duplicar funções que já existem ou ignora o arquivo completamente.</p>
+        <p><strong>Solução:</strong> <code>utils/</code> deve ser uma pasta com arquivos nomeados por função: <code>email.py</code>, <code>formatters.py</code>, <code>validators.py</code>. Se um helper tem lógica de domínio, ele pertence ao service daquele domínio — não a <code>utils</code>.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">⛔</span>
+        <h3>Anti-Padrão 5 — Iniciar sessão sem ler o contexto</h3>
+        <p>O desenvolvedor vai direto ao ponto sem usar o Prompt Padrão de Sessão. A LLM executa — mas sem saber que aquele model tem uma restrição documentada no <code>CONTEXT.md</code>, ou que o schema relacionado precisa ser atualizado junto.</p>
+        <p>O código funciona, mas o projeto perde coerência silenciosamente. Sessão após sessão, o acúmulo de decisões tomadas sem contexto destrói a arquitetura.</p>
+        <p><strong>Solução:</strong> sempre usar o Prompt Padrão de Sessão. A leitura do contexto antes da ação é o que separa uma sessão produtiva de uma que gera débito técnico invisível.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 14 — EXEMPLO END-TO-END -->
+  <section id="exemplo-sessao">
+    <div class="section-header">
+      <div class="section-num">14</div>
+      <div class="section-title-block">
+        <div class="section-tag">Da teoria à prática</div>
+        <h2>Exemplo End-to-End de uma Sessão Real</h2>
+      </div>
+    </div>
+
+    <p>A teoria faz sentido — mas como é uma sessão LLM-First na prática? O exemplo a seguir mostra o ciclo completo para uma tarefa concreta: <strong>implementar recuperação de senha por e-mail</strong>.</p>
+
+    <h3 style="margin:32px 0 12px">Passo 1 — Dev abre a sessão com o Prompt Padrão</h3>
+    <p>O desenvolvedor usa o prompt de abertura padrão informando a tarefa:</p>
+
+    <div class="prompt-box">
+      <div class="prompt-header">Prompt de Abertura — Exemplo</div>
+      <div class="prompt-body">Você está operando em um projeto que segue o LLM-First Architecture.
+
+Antes de qualquer ação, leia o CONTEXT.md da raiz e o CONTEXT.md de cada pasta afetada.
+Tarefa: implementar recuperação de senha via e-mail com link de token temporário.</div>
+    </div>
+
+    <h3 style="margin:32px 0 12px">Passo 2 — LLM lê o CONTEXT.md da raiz</h3>
+    <p>A LLM descobre as informações essenciais do projeto:</p>
+    <ul style="margin-left:18px;color:var(--text2);font-size:14px;line-height:1.8">
+      <li>Stack: FastAPI + PostgreSQL + JWT</li>
+      <li>Autenticação centralizada em <code>core/security.py</code></li>
+      <li>Envio de e-mail já existe em <code>utils/email.py</code></li>
+      <li>Regras de negócio sempre em <code>services/</code></li>
+      <li>Restrição global: nunca acessar o banco diretamente em <code>api/</code></li>
+    </ul>
+
+    <h3 style="margin:32px 0 12px">Passo 3 — LLM identifica as camadas afetadas e lê seus CONTEXT.md</h3>
+    <p>A LLM mapeia todas as pastas que a tarefa vai tocar e lê o <code>CONTEXT.md</code> de cada uma:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Pasta</th>
+            <th>Motivo</th>
+            <th>O que o CONTEXT.md revela</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>models/</code></td>
+            <td>Novo model de token</td>
+            <td>Padrão de nomenclatura e como declarar entidades</td>
+          </tr>
+          <tr>
+            <td><code>schemas/</code></td>
+            <td>Novo contrato de request</td>
+            <td>Padrão de naming dos schemas</td>
+          </tr>
+          <tr>
+            <td><code>services/</code></td>
+            <td>Lógica de geração e validação</td>
+            <td>Restrição: não retornar <code>HTTPException</code> aqui</td>
+          </tr>
+          <tr>
+            <td><code>api/</code></td>
+            <td>Nova rota</td>
+            <td>Restrição: sem lógica de negócio</td>
+          </tr>
+          <tr>
+            <td><code>utils/</code></td>
+            <td>Envio de e-mail</td>
+            <td><code>email.py</code> já existe com função <code>enviar_email()</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="margin:32px 0 12px">Passo 4 — LLM reporta o plano antes de agir</h3>
+    <p>Antes de escrever qualquer código, a LLM apresenta o plano:</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">plano-implementacao-reset-senha.txt</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold">Plano de implementação:</span>
+
+<span class="c-white">1.</span> models/password_reset.py     <span class="c-dim">→ criar model PasswordResetToken</span>
+<span class="c-white">2.</span> schemas/auth_schema.py       <span class="c-dim">→ adicionar PasswordResetRequest e PasswordResetConfirm</span>
+<span class="c-white">3.</span> services/auth_service.py     <span class="c-dim">→ adicionar solicitar_reset() e confirmar_reset()</span>
+<span class="c-white">4.</span> api/auth.py                  <span class="c-dim">→ adicionar POST /auth/reset e POST /auth/reset/confirm</span>
+<span class="c-white">5.</span> utils/email.py               <span class="c-dim">→ adicionar enviar_email_reset()</span>
+
+<span class="c-dim">Observação: core/security.py já tem criar_token() — será reutilizado,
+não será criada função duplicada. Isso está alinhado com a restrição
+documentada no CONTEXT.md do core.</span></pre>
+      </div>
+    </div>
+
+    <h3 style="margin:32px 0 12px">Passo 5 — LLM implementa camada por camada, na ordem correta</h3>
+    <p>A implementação segue a ordem do fluxo de dependência — de dentro para fora:</p>
+    <ul style="margin-left:18px;color:var(--text2);font-size:14px;line-height:1.8">
+      <li><strong><code>models/password_reset.py</code></strong> — base de dados definida primeiro.</li>
+      <li><strong><code>schemas/auth_schema.py</code></strong> — contrato de entrada/saída definido.</li>
+      <li><strong><code>services/auth_service.py</code></strong> — lógica implementada sobre models e schemas já definidos.</li>
+      <li><strong><code>api/auth.py</code></strong> — rota criada sobre o service já pronto.</li>
+    </ul>
+    <p>Cada camada só é escrita após a anterior estar definida. Isso evita retrabalho e garante que as dependências estejam corretas.</p>
+
+    <h3 style="margin:32px 0 12px">Passo 6 — LLM atualiza os CONTEXT.md de cada pasta tocada</h3>
+    <p>Antes de encerrar a sessão, a LLM atualiza cada <code>CONTEXT.md</code> afetado:</p>
+    <ul style="margin-left:18px;color:var(--text2);font-size:14px;line-height:1.8">
+      <li><strong><code>models/CONTEXT.md</code></strong> — adiciona <code>password_reset.py</code> na tabela de arquivos.</li>
+      <li><strong><code>schemas/CONTEXT.md</code></strong> — registra os dois novos schemas.</li>
+      <li><strong><code>services/CONTEXT.md</code></strong> — documenta <code>solicitar_reset()</code> e <code>confirmar_reset()</code>.</li>
+      <li><strong><code>api/CONTEXT.md</code></strong> — registra as duas novas rotas.</li>
+      <li><strong><code>utils/CONTEXT.md</code></strong> — registra <code>enviar_email_reset()</code> em <code>email.py</code>.</li>
+    </ul>
+
+    <h3 style="margin:32px 0 12px">Passo 7 — Próxima sessão começa do mesmo ponto</h3>
+    <p>Qualquer LLM — ou o mesmo modelo em uma nova conversa — lê os <code>CONTEXT.md</code> e sabe exatamente:</p>
+    <ul style="margin-left:18px;color:var(--text2);font-size:14px;line-height:1.8">
+      <li>O que existe em cada camada.</li>
+      <li>Como foi implementado e por quê.</li>
+      <li>O que não deve ser alterado.</li>
+    </ul>
+    <p><strong>Resultado: zero perda de contexto entre sessões.</strong></p>
+
+    <h3 style="margin:32px 0 12px">Resumo do diff da sessão</h3>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">diff-reset-senha.patch</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-gold"># Arquivos criados ou modificados nesta sessão</span>
+
+<span class="c-green">+ models/password_reset.py</span>        <span class="c-dim">← novo model: PasswordResetToken</span>
+<span class="c-green">+ schemas/auth_schema.py</span>          <span class="c-dim">← novo: PasswordResetRequest, PasswordResetConfirm</span>
+<span class="c-blue">~ services/auth_service.py</span>        <span class="c-dim">← novas funções: solicitar_reset(), confirmar_reset()</span>
+<span class="c-blue">~ api/auth.py</span>                     <span class="c-dim">← novas rotas: POST /auth/reset, POST /auth/reset/confirm</span>
+<span class="c-blue">~ utils/email.py</span>                  <span class="c-dim">← nova função: enviar_email_reset()</span>
+
+<span class="c-gold"># CONTEXT.md atualizados</span>
+<span class="c-blue">~ models/CONTEXT.md</span>               <span class="c-dim">← password_reset.py adicionado ao índice</span>
+<span class="c-blue">~ schemas/CONTEXT.md</span>              <span class="c-dim">← novos schemas registrados</span>
+<span class="c-blue">~ services/CONTEXT.md</span>             <span class="c-dim">← novas funções documentadas</span>
+<span class="c-blue">~ api/CONTEXT.md</span>                  <span class="c-dim">← novas rotas registradas</span>
+<span class="c-blue">~ utils/CONTEXT.md</span>                <span class="c-dim">← enviar_email_reset() documentada</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 15 — O QUE ESTE MÉTODO NÃO RESOLVE -->
+  <section id="limites">
+    <div class="section-header">
+      <div class="section-num">15</div>
+      <div class="section-title-block">
+        <div class="section-tag">Limites claros do método</div>
+        <h2>O que este método não resolve</h2>
+      </div>
+    </div>
+
+    <p>Nenhum método é solução universal. LLM-First Architecture resolve problemas específicos de contexto e previsibilidade — mas existe um conjunto claro de problemas que estão fora do seu escopo. Conhecer esses limites é essencial para aplicar o método com expectativas corretas.</p>
+
+    <div class="card-grid" style="margin-top:32px">
+      <div class="card">
+        <span class="card-icon">🧠</span>
+        <h3>Não substitui um desenvolvedor experiente</h3>
+        <p>O método organiza o contexto para a LLM agir com mais precisão — mas decisões de arquitetura de alto nível, escolha de tecnologias e trade-offs de produto ainda exigem julgamento humano.</p>
+        <p>A estrutura de pastas pode ser perfeita e o <code>CONTEXT.md</code> impecável — mas se a decisão de negócio por trás da feature estiver errada, o código estará errado de forma organizada.</p>
+        <p><strong>A IA executa melhor. Não julga por você.</strong></p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🧪</span>
+        <h3>Não substitui testes automatizados</h3>
+        <p><code>CONTEXT.md</code> documenta intenção e restrições. Ele não garante que o código implementado funciona corretamente.</p>
+        <p>Um service pode estar no lugar certo, respeitar todas as restrições da camada e ainda assim ter um bug lógico que só um teste unitário vai revelar.</p>
+        <p>Testes automatizados continuam sendo a única forma de verificar comportamento real do código.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🤖</span>
+        <h3>Não elimina alucinações do modelo</h3>
+        <p>O método reduz significativamente o espaço para erros de contexto ao tornar as responsabilidades explícitas — mas não elimina a possibilidade de a LLM gerar código incorreto, usar uma API de forma errada ou introduzir um bug sutil.</p>
+        <p>Revisão humana do output continua sendo necessária, especialmente em lógica crítica, financeira ou de segurança.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">📐</span>
+        <h3>Não resolve má arquitetura prévia</h3>
+        <p>Aplicar o método em um projeto já desorganizado — com lógica espalhada, dependências circulares e arquivos sem responsabilidade clara — exige refatoração antes de qualquer ganho.</p>
+        <p>LLM-First Architecture é mais eficaz quando adotado desde o início do projeto.</p>
+        <p>Migrar um projeto legado caótico para o método é um projeto por si só, e deve ser tratado como tal.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">⚖️</span>
+        <h3>Adiciona overhead de manutenção</h3>
+        <p>Manter os <code>CONTEXT.md</code> atualizados tem custo real. Cada sessão que modifica código exige que o desenvolvedor — ou a LLM — dedique tempo para atualizar a documentação das camadas afetadas.</p>
+        <p>Em projetos muito pequenos, de prototipagem rápida ou de vida curta, esse overhead pode não se justificar. O método cresce em valor proporcional ao tamanho, complexidade e longevidade do projeto.</p>
+      </div>
+
+      <div class="card">
+        <span class="card-icon">🔒</span>
+        <h3>Não garante segurança do código</h3>
+        <p>O método organiza onde o código de segurança vive (<code>core/security.py</code>) e documenta suas restrições — mas não faz auditoria de segurança.</p>
+        <p>Vulnerabilidades em autenticação, injeção de dados, exposição de endpoints e gestão de segredos ainda dependem de revisão especializada e ferramentas dedicadas de análise de segurança.</p>
+      </div>
+    </div>
+
+    <div class="quote-block" style="margin-top:40px">
+      <p>"Um método honesto sobre seus limites é um método em que você pode confiar nos seus pontos fortes."</p>
+    </div>
+  </section>
+
+  <!-- SEÇÃO 16 — A ORIGEM -->
+  <section id="origem">
+    <div class="section-header">
+      <div class="section-num">16</div>
+      <div class="section-title-block">
+        <div class="section-tag">A história por trás do método</div>
+        <h2>De onde veio o LLM-First Architecture</h2>
+      </div>
+    </div>
+
+    <p>
+      Todo método nasce de uma dor real. Esta seção conta a origem do LLM-First Architecture
+      — não como narrativa de marketing, mas como registro honesto do caminho que levou
+      a uma solução que ninguém havia documentado antes.
+    </p>
+
+    <!-- timeline -->
+    <div style="position:relative; margin: 48px 0 56px;">
+
+      <!-- linha vertical -->
+      <div style="position:absolute;left:19px;top:8px;bottom:8px;width:1px;background:var(--border2);"></div>
+
+      <!-- item 1 -->
+      <div style="display:flex;gap:28px;margin-bottom:36px;position:relative;">
+        <div style="width:40px;height:40px;min-width:40px;background:var(--surface);border:2px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:800;color:var(--text3);position:relative;z-index:1;">13</div>
+        <div style="padding-top:8px;">
+          <h4 style="color:var(--text3);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;">Primeiro contato — curiosidade pura</h4>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+            Aos 13 anos, um computador novo e a internet ainda engatinhando no Brasil. Era a época do Orkut, do MSN,
+            dos jogos online como <strong>WYD, MU e Gunbound</strong>. A curiosidade natural de qualquer jovem da época
+            levou a uma pergunta que mudaria tudo: <em>como funcionam os cheats e trainers desses jogos?</em>
+            Um vídeo que demorou dois dias para baixar — e que apresentou o Visual Studio 5.0 — foi o primeiro contato
+            com o mundo da programação. Não por obrigação. Por fascínio.
+          </p>
+        </div>
+      </div>
+
+      <!-- item 2 -->
+      <div style="display:flex;gap:28px;margin-bottom:36px;position:relative;">
+        <div style="width:40px;height:40px;min-width:40px;background:var(--surface);border:2px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:800;color:var(--text3);position:relative;z-index:1;">~20</div>
+        <div style="padding-top:8px;">
+          <h4 style="color:var(--text3);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;">Uma década de aprendizado não linear</h4>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+            Sem formação técnica formal, os anos seguintes foram de exploração autodidata.
+            Servidores privados de jogos rodando em máquina própria — primeiro Gunbound, depois WYD —
+            forçaram o contato precoce com <strong>C++, MySQL, Apache, PHP e HTML</strong>.
+            Não era estudo estruturado. Era necessidade prática: para o servidor funcionar, o banco de dados precisava funcionar.
+            Foi aí que nasceu um amor que permanece até hoje —
+            <strong>a persistência de dados, a elegância de um schema bem modelado, a lógica que vive no banco.</strong>
+          </p>
+        </div>
+      </div>
+
+      <!-- item 3 -->
+      <div style="display:flex;gap:28px;margin-bottom:36px;position:relative;">
+        <div style="width:40px;height:40px;min-width:40px;background:var(--surface);border:2px solid var(--border2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:10px;font-weight:800;color:var(--text3);position:relative;z-index:1;">31</div>
+        <div style="padding-top:8px;">
+          <h4 style="color:var(--text3);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;">A decisão — ADS, São Paulo, 2023</h4>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+            Com 31 anos, a decisão de formalizar o que a curiosidade havia ensinado de forma fragmentada.
+            Início do curso de <strong>Análise e Desenvolvimento de Sistemas</strong> em março de 2023 —
+            concluído em dezembro de 2025. Três anos de formação acadêmica que confirmaram uma percepção já existente:
+            <em>a lógica sempre foi o ponto forte. Escrever código de backend do zero, o ponto fraco.</em>
+            Arquitetura, regras de negócio, modelagem de dados, infraestrutura — naturais.
+            Implementação linha a linha no backend — lenta, custosa, frequentemente errada.
+            Essa tensão foi o ponto de partida para tudo que veio depois.
+          </p>
+        </div>
+      </div>
+
+      <!-- item 4 — destaque -->
+      <div style="display:flex;gap:28px;margin-bottom:36px;position:relative;">
+        <div style="width:40px;height:40px;min-width:40px;background:var(--accent-dim);border:2px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:9px;font-weight:800;color:var(--accent);position:relative;z-index:1;box-shadow:0 0 16px var(--accent-glow)">2023</div>
+        <div style="padding-top:8px;">
+          <h4 style="color:var(--accent);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;">Fevereiro de 2023 — o momento que mudou tudo</h4>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:12px;">
+            Três meses após o lançamento do ChatGPT no Brasil, o primeiro contato com o modelo.
+            A reação não foi de curiosidade casual — foi de <strong>reconhecimento imediato</strong>.
+            Ali estava a resposta para a tensão que existia há anos: a lacuna entre pensar a solução com clareza
+            e conseguir escrever o código que a implementava.
+          </p>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+            A percepção foi clara desde o início: <em>isso não é uma ferramenta de busca melhorada.
+            É uma nova camada de programação.</em> A questão não era se as LLMs iam mudar o desenvolvimento de software —
+            era entender como essa camada funcionava por dentro para usá-la com precisão, não com sorte.
+          </p>
+        </div>
+      </div>
+
+      <!-- item 5 -->
+      <div style="display:flex;gap:28px;position:relative;">
+        <div style="width:40px;height:40px;min-width:40px;background:var(--accent);border:2px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:9px;font-weight:800;color:var(--bg);position:relative;z-index:1;">now</div>
+        <div style="padding-top:8px;">
+          <h4 style="color:var(--accent);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:6px;">3 anos de estudo — o caminho até o método</h4>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+            Os anos seguintes foram dedicados a entender LLMs com profundidade técnica:
+            limites de janela de contexto de diferentes modelos, NLP aplicado a engenharia de prompt,
+            tentativa de construção de modelo próprio, mais de 200 projetos experimentais com diferentes arquiteturas
+            e abordagens de colaboração com IA. <strong>O LLM-First Architecture não foi planejado em uma tarde.</strong>
+            Foi destilado de centenas de falhas documentadas — projetos que a IA degradou progressivamente,
+            inconsistências que se acumularam, sessões que perderam o fio condutor.
+            O método é a resposta estrutural a um problema que só quem passou por ele entende completamente.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- a tensão central -->
+    <div class="two-col" style="margin-bottom:40px">
+      <div>
+        <h3>O paradoxo que gerou o método</h3>
+        <p style="font-size:13px;line-height:1.9;">
+          Era possível projetar a arquitetura de um sistema complexo, modelar o banco de dados com precisão,
+          definir regras de negócio detalhadas e pensar em infraestrutura com Docker e ambientes separados —
+          mas transformar tudo isso em código backend funcional consumia tempo desproporcional
+          e frequentemente resultava em implementações frágeis.
+        </p>
+        <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+          A lógica estava clara. O código não saía. Essa é uma tensão que mais desenvolvedores
+          experimentam do que admitem — e que as LLMs deveriam resolver, mas não resolviam de forma consistente
+          em projetos com arquitetura real.
+        </p>
+      </div>
+      <div>
+        <h3>A conclusão que gerou a arquitetura</h3>
+        <p style="font-size:13px;line-height:1.9;">
+          O problema não era a LLM. Era a ausência de estrutura que permitisse à LLM
+          <strong>manter coerência ao longo do tempo</strong>.
+          Um modelo pode ser brilhante em uma sessão e destrutivo na próxima —
+          não porque ficou menos inteligente, mas porque perdeu o mapa do território.
+        </p>
+        <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+          A solução era criar esse mapa. Não como documentação para humanos lerem depois —
+          mas como <em>contexto estruturado que a IA lê antes de agir</em>.
+          Essa mudança de perspectiva é o núcleo de tudo.
+        </p>
+      </div>
+    </div>
+
+    <!-- o que acredito -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:36px;position:relative;overflow:hidden;margin-bottom:40px;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--info),transparent)"></div>
+      <h3 style="margin-bottom:20px;">O que este caminho ensinou sobre o futuro do desenvolvimento</h3>
+      <p style="font-size:13px;line-height:1.9;margin-bottom:16px;">
+        A programação evoluiu em camadas de abstração. Cartões perfurados, Assembly, C, linguagens de alto nível,
+        frameworks declarativos — cada salto foi um aumento na distância entre a intenção humana e a instrução da máquina.
+        <strong>O prompt estruturado é o próximo salto.</strong> Não é uma linguagem no sentido formal —
+        mas é um protocolo de instrução com sintaxe própria, regras implícitas de estrutura
+        e consequências diretas na qualidade do que é produzido.
+      </p>
+      <p style="font-size:13px;line-height:1.9;margin-bottom:16px;">
+        Quem aprende a operar nessa camada com precisão — entendendo como o modelo processa contexto,
+        onde ele falha, quais restrições precisa receber explicitamente — não está usando IA como ferramenta.
+        <em>Está programando em um nível de abstração mais alto do que qualquer linguagem existente.</em>
+      </p>
+      <p style="font-size:13px;line-height:1.9;margin-bottom:0;">
+        O LLM-First Architecture é uma tentativa de formalizar esse nível. De transformar em protocolo
+        o que hoje ainda depende de intuição individual. A visão de longo prazo é mais ambiciosa:
+        um modelo treinado especificamente para operar dentro desta arquitetura como padrão nativo —
+        onde a estrutura de pastas, os <code>CONTEXT.md</code> e o protocolo de sessão não são instruções externas,
+        mas conhecimento interno do modelo. <strong>Esse seria o marco de uma nova geração de LLMs voltadas ao desenvolvimento.</strong>
+      </p>
+    </div>
+
+    <!-- linha do código -->
+    <div class="code-block">
+      <div class="code-header">
+        <div class="dots"><span class="dot dot-r"></span><span class="dot dot-y"></span><span class="dot dot-g"></span></div>
+        <span class="filename">evolucao-da-programacao.txt</span>
+        <span></span>
+      </div>
+      <div class="code-body">
+<pre><span class="c-dim">// A programação sempre evoluiu para mais abstração</span>
+
+<span class="c-gold">Nível 1</span>  <span class="c-dim">→</span>  <span class="c-red">Cartão perfurado</span>          <span class="c-dim">instruções binárias, sem abstração</span>
+<span class="c-gold">Nível 2</span>  <span class="c-dim">→</span>  <span class="c-red">Assembly</span>                  <span class="c-dim">controle total, trabalho enorme</span>
+<span class="c-gold">Nível 3</span>  <span class="c-dim">→</span>  <span class="c-blue">C, Java</span>                   <span class="c-dim">abstrações surgem, produtividade sobe</span>
+<span class="c-gold">Nível 4</span>  <span class="c-dim">→</span>  <span class="c-blue">Python, frameworks</span>        <span class="c-dim">quase linguagem natural, altíssimo nível</span>
+<span class="c-gold">Nível 5</span>  <span class="c-dim">→</span>  <span class="c-green">Prompt estruturado</span>        <span class="c-dim">você descreve intenção, contexto e regras</span>
+           <span class="c-dim">                           a máquina resolve a implementação</span>
+
+<span class="c-dim">// O engenheiro de prompt não é quem digita mais rápido.</span>
+<span class="c-dim">// É quem entende a máquina fundo o suficiente para</span>
+<span class="c-dim">// dar a ela o contexto certo, no momento certo.</span>
+
+<span class="c-green">— Horst Fernandes Seifert</span>  <span class="c-dim">São Paulo · 2025</span></pre>
+      </div>
+    </div>
+
+    <div class="quote-block">
+      <p>"Entender a máquina é o caminho para usá-la. Não a máquina que executa — a máquina que raciocina."</p>
+    </div>
+
+  </section>
+
+  <!-- AUTOR -->
+  <section id="autor" style="border-bottom: 1px solid var(--border);">
+    <div class="section-header">
+      <div class="section-num">—</div>
+      <div class="section-title-block">
+        <div class="section-tag">Origem da Ideia</div>
+        <h2>Autor &amp; Inspiração</h2>
+      </div>
+    </div>
+
+    <div class="two-col" style="margin-bottom: 40px">
+      <div>
+        <h3 style="margin-bottom: 20px">Quem criou este método</h3>
+        <div class="card" style="gap: 0">
+          <div style="display:flex; align-items:center; gap: 16px; margin-bottom: 24px">
+            <div style="width:52px;height:52px;border-radius:50%;background:var(--accent-dim);border:2px solid rgba(0,229,160,0.3);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--accent)">HS</div>
+            <div>
+              <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--text)">Horst Fernandes Seifert</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px;letter-spacing:0.05em">Criador · LLM-First Architecture</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2)">
+              <span style="color:var(--accent);font-size:12px">✉</span>
+              <a href="mailto:HorstWorks@gmail.com" style="color:var(--text2);text-decoration:none;transition:color 0.2s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'">HorstWorks@gmail.com</a>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2)">
+              <span style="color:var(--accent);font-size:12px">☏</span>
+              <span>(11) 94980-1876</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text2)">
+              <span style="color:var(--accent);font-size:12px">◷</span>
+              <span>Iniciativa registrada em <strong style="color:var(--text)">03 de março de 2025</strong></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 style="margin-bottom: 20px">A inspiração por trás do método</h3>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent)"></div>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:14px">
+            Este método nasceu de uma observação prática e recorrente: <strong>LLMs falham de forma sistemática ao tentar desenvolver e escalar projetos de software com arquiteturas complexas.</strong>
+          </p>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:14px">
+            Mesmo engenheiros de prompt experientes encontram uma barreira difícil de transpor — à medida que um projeto cresce em número de arquivos e camadas de responsabilidade, a LLM perde a capacidade de manter coerência entre as partes. Ela começa a <em>alucinar contexto</em>: assume responsabilidades erradas para arquivos, cria dependências invertidas, repete lógica em camadas distintas ou quebra funcionalidades existentes ao tentar implementar algo novo.
+          </p>
+          <p style="font-size:13px;line-height:1.9;margin-bottom:0">
+            O problema não é a inteligência do modelo — é a <strong>ausência de uma arquitetura projetada para ser lida e mantida por ele</strong>. LLM-First Architecture surgiu para preencher exatamente essa lacuna: transformar a estrutura do projeto em contexto explícito, previsível e auditável, para que a IA possa agir com precisão independentemente da complexidade acumulada.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>LLM-First Architecture · v0.1 · © 2025 Horst Fernandes Seifert · <a href="mailto:HorstWorks@gmail.com" style="color:var(--text3);text-decoration:none">HorstWorks@gmail.com</a></p>
+    <span class="footer-badge">AI-Assisted Development</span>
+  </footer>
+
+</main>
+
+<script>
+  // ── INTERSECTION OBSERVER — reveal sections ──
+  const sections = document.querySelectorAll('section');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.08 });
+
+  sections.forEach(s => observer.observe(s));
+
+  // ── ACTIVE NAV LINK ──
+  const navLinks = document.querySelectorAll('nav a');
+
+  const sectionIds = ['problema','metodo','principios','estrutura','context','anatomia','fluxo','protocolo','llm-guide','prompt','comparacao','roadmap','anti-padroes','exemplo-sessao','limites'];
+
+  const navObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        navLinks.forEach(link => {
+          link.classList.remove('active');
+          if (link.getAttribute('href') === '#' + id) {
+            link.classList.add('active');
+          }
+        });
+      }
+    });
+  }, { threshold: 0.3, rootMargin: '-10% 0px -60% 0px' });
+
+  sectionIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) navObserver.observe(el);
+  });
+
+  // ── HERO also marks first link active on load ──
+  navLinks[0].classList.add('active');
+</script>
+</body>
+</html>
